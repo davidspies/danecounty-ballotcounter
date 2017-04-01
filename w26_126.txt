@@ -1,0 +1,10 @@
+fuzzy: 2
+multiple: 1
+blank: 6
+castle: 3
+clinton: 720
+johnson: 43
+moorehead: 1
+stein: 12
+trump: 222
+write-in: 13
