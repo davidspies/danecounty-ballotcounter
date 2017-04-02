@@ -1,9 +1,13 @@
 import collections
+import multiprocessing as mp
 import numpy as np
-import scipy.misc as misc
+import os
+from os import path
+import pandas as pd
+from scipy import misc
 import scipy.ndimage as im
-import zipfile
 import sys
+import zipfile
 
 candidates = [
     ("trump", (19, 1)),
@@ -39,19 +43,12 @@ class Counter(object):
                  scalefactor = 0.125, # Scale ballot images
                  ignoreleftmargin = 5, # Ignore any items with pixels in this margin
                  ignoretopmargin = 5, # ""
-                 tiltallowance = 8, # The left/top alignment boxes can vary by this many pixels
-                 emptybubblethreshold = 1200, # Less than this counts as no tick
-                 filledbubblethreshold = 1800): # More than this counts as a tick
-        self.unclear = [] # List of ballots which had difficulty being read
-        self.votesFor = collections.defaultdict(list) # Normal ballots
-        self.blank = [] # No bubble filled in
-        self.multiple = [] # Multiple bubbles filled in
+                 tiltallowance = 8): # The left/top alignment boxes can vary by this many pixels
         self.scalefactor = scalefactor
         self.ignoreleftmargin = ignoreleftmargin
         self.ignoretopmargin = ignoretopmargin
         self.tiltallowance = tiltallowance
-        self.emptybubblethreshold = emptybubblethreshold
-        self.filledbubblethreshold = filledbubblethreshold
+        self.bubbleDarkness = []
 
     def count(self, ballotname, imarr):
         arr = misc.imresize(imarr, self.scalefactor)
@@ -76,50 +73,49 @@ class Counter(object):
                     ]
         horizboxes.sort(key=lambda b: b[1].start)
         vertboxes.sort(key=lambda b: b[0].start)
-        isvote = []
+        bubbles = {"ballot":ballotname}
         # If we have the wrong number of alignment boxes, ignore this ballot
         if(len(vertboxes) != 38 or len(horizboxes) != 4):
-            self.unclear.append(ballotname)
-            return
-        for (name, (r, c)) in candidates:
-            (posr, posc) = expand(add(vertboxes[r],
-                                      sub(horizboxes[c], horizboxes[0])))
-            # How dark is this bubble?
-            value = np.sum(255 - arr[posr, posc])
-            if value >= self.filledbubblethreshold:
-                isvote.append(name)
-            elif value >= self.emptybubblethreshold:
-                self.unclear.append(ballotname)
-                break
+            bubbles["badBoxes"] = True
         else:
-            if len(isvote) == 0:
-                self.blank.append(ballotname)
-            elif len(isvote) == 1:
-                [k] = isvote
-                self.votesFor[k].append(ballotname)
-            else:
-                self.multiple.append(ballotname)
-    def __str__(self):
-        return "fuzzy: %d\nmultiple: %d\nblank: %d\n%s" % (
-            len(self.unclear),
-            len(self.multiple),
-            len(self.blank),
-            showcvotes(self.votesFor)
-        )
+            bubbles["badBoxes"] = False
+            for (name, (r, c)) in candidates:
+                (posr, posc) = expand(add(vertboxes[r],
+                                          sub(horizboxes[c], horizboxes[0])))
+                # How dark is this bubble?
+                value = np.sum(255 - arr[posr, posc])
+                bubbles[name] = value
+        self.bubbleDarkness.append(bubbles)
+    def toDF(self):
+        return pd.DataFrame(self.bubbleDarkness)
 
-def main(zfname):
+def runctr(zfname):
+    print("Starting " + zfname, file=sys.stderr)
     ctr = Counter()
-    if zfname.endswith(".zip"):
+    (unused_base, ext) = path.splitext(zfname)
+    if ext == ".zip":
         with zipfile.ZipFile(zfname, 'r') as f:
             allnames = f.namelist()
             for filename in allnames:
                 if filename.endswith("F.pbm"):
-                    print(filename, file=sys.stderr)
                     imarr = misc.imread(f.open(filename))
                     ctr.count(filename, imarr)
-    elif zfname.endswith(".pbm"):
+    elif ext == ".pbm":
         ctr.count(zfname, misc.imread(zfname))
-    print(ctr)
+    else:
+        raise Exception("Unknown extension: %s" % ext)
+    print("Finished " + zfname, file=sys.stderr)
+    return (zfname, ctr.toDF())
+
+def main(readdir, store_file, nprocs):
+    files = os.listdir(readdir)
+    fullfiles = [path.join(readdir, f) for f in files]
+    with pd.HDFStore(store_file) as store:
+        incomplete = [f for f in fullfiles if f not in store]
+    with mp.Pool(nprocs) as pool:
+        for (zfname, df) in pool.imap_unordered(runctr, incomplete):
+            df.to_hdf(store_file, zfname)
+    pd.Series(fullfiles).to_hdf(store_file, "tables")
 
 if __name__ == '__main__':
-    main(sys.argv[1])
+    main(sys.argv[1], sys.argv[2], int(sys.argv[3]))
