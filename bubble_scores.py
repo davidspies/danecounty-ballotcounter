@@ -10,16 +10,7 @@ import scipy.ndimage as im
 import sys
 import zipfile
 
-candidates = [
-    ("trump", (19, 1)),
-    ("clinton", (21, 1)),
-    ("castle", (23, 1)),
-    ("johnson", (25, 1)),
-    ("stein", (27, 1)),
-    ("moorehead", (29, 1)),
-    ("roque", (31, 1)),
-    ("write-in", (33, 1))
-]
+from candidates import candidates
 
 def add(box, shift):
     (sr, sc) = box
