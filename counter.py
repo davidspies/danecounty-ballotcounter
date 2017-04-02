@@ -1,4 +1,5 @@
 import collections
+import getopt
 import multiprocessing as mp
 import numpy as np
 import os
@@ -118,4 +119,8 @@ def main(readdir, store_file, nprocs):
     pd.Series(fullfiles).to_hdf(store_file, "tables")
 
 if __name__ == '__main__':
-    main(sys.argv[1], sys.argv[2], int(sys.argv[3]))
+    (vals, [readdir]) = getopt.gnu_getopt(sys.argv[1:],"",["store=", "nprocs="])
+    dvals = dict(vals)
+    store = dvals["--store"]
+    nprocs = dvals.get("--nprocs")
+    main(readdir, store, nprocs and int(nprocs))
