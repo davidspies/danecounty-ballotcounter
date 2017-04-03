@@ -1,17 +1,17 @@
 >>> from count_utils import *
 >>> bubbles = all_ballots("bubbles.h5")
->>> votes = assign_votes(bubbles, lothreshold = 1200, hithreshold = 1800)
+>>> votes = assign_votes(bubbles, lothreshold = 1200, hithreshold = 1300)
 >>> votes.value_counts()
-clinton      188647
-trump         59904
-johnson        9186
-stein          3771
-write-in       3712
-blank          1916
-fuzzy           762
+clinton      189047
+trump         60043
+johnson        9197
+stein          3778
+write-in       3735
+blank          1918
 badBoxes        669
-castle          661
-multiple        178
-moorehead       155
+castle          665
+multiple        224
+moorehead       156
+fuzzy           129
 roque           114
 dtype: int64
