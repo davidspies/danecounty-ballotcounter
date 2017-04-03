@@ -1,9 +1,0 @@
-fuzzy: 2
-multiple: 0
-blank: 7
-castle: 1
-clinton: 462
-johnson: 25
-stein: 5
-trump: 198
-write-in: 9
